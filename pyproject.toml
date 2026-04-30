@@ -1,0 +1,31 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "calculator"
+version = "0.1.0"
+description = "A small, dependency-free arithmetic calculator with a CLI."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Yuri Novo" }]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+calc = "calculator.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/calculator"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/calculator", "README.md", "pyproject.toml"]
