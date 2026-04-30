@@ -56,11 +56,74 @@ def test_invalid_syntax():
         "__import__('os')",
         "open('foo')",
         "2 + 'a'",
-        "abs(-1)",
         "True + 1",
         "[1, 2]",
+        "math.sqrt(4)",
     ],
 )
 def test_rejects_unsafe_or_unsupported(expr):
     with pytest.raises(CalculatorError):
         evaluate(expr)
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ("sqrt(16)", 4.0),
+        ("sqrt(2) ** 2", 2.0),
+        ("abs(-7)", 7),
+        ("abs(-3.5)", 3.5),
+        ("floor(3.7)", 3),
+        ("ceil(3.2)", 4),
+        ("log2(1024)", 10.0),
+        ("log10(1000)", 3.0),
+        ("log(8, 2)", 3.0),
+        ("exp(0)", 1.0),
+        ("pow(2, 10)", 1024),
+    ],
+)
+def test_scientific_functions(expr, expected):
+    assert math.isclose(evaluate(expr), expected)
+
+
+def test_log_of_e():
+    assert math.isclose(evaluate("log(e)"), 1.0)
+
+
+def test_trig_with_pi():
+    assert math.isclose(evaluate("sin(pi)"), 0.0, abs_tol=1e-9)
+    assert math.isclose(evaluate("cos(0)"), 1.0)
+    assert math.isclose(evaluate("tan(pi / 4)"), 1.0)
+
+
+@pytest.mark.parametrize(
+    "name, expected",
+    [("pi", math.pi), ("e", math.e), ("tau", math.tau)],
+)
+def test_constants(name, expected):
+    assert evaluate(name) == expected
+
+
+def test_function_composition():
+    assert math.isclose(evaluate("sqrt(sqrt(16))"), 2.0)
+    assert evaluate("ceil(log2(1000))") == 10
+
+
+def test_unknown_function():
+    with pytest.raises(CalculatorError, match="unknown function"):
+        evaluate("nope(1)")
+
+
+def test_unknown_constant():
+    with pytest.raises(CalculatorError, match="unknown name"):
+        evaluate("unknown_var")
+
+
+def test_function_domain_error():
+    with pytest.raises(CalculatorError, match="sqrt"):
+        evaluate("sqrt(-1)")
+
+
+def test_function_keyword_args_rejected():
+    with pytest.raises(CalculatorError, match="keyword"):
+        evaluate("log(8, base=2)")
