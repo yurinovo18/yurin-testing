@@ -2,7 +2,10 @@
 
 A small arithmetic calculator with a CLI. Zero runtime dependencies — uses only the Python standard library.
 
-Supports `+`, `-`, `*`, `/`, `//`, `%`, `**`, unary `+`/`-`, and parentheses with normal operator precedence.
+Supports:
+- Arithmetic: `+`, `-`, `*`, `/`, `//`, `%`, `**`, unary `+`/`-`, and parentheses with normal precedence.
+- Functions: `sqrt`, `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `log` (also `log(x, base)`), `log2`, `log10`, `exp`, `floor`, `ceil`, `abs`, `pow`.
+- Constants: `pi`, `e`, `tau`.
 
 ## Install
 
@@ -15,6 +18,9 @@ pip install -e ".[dev]"
 ```bash
 calc "2 + 3 * 4"        # 14
 calc "(1 + 2) ** 3"     # 27
+calc "sqrt(16)"         # 4.0
+calc "log2(1024)"       # 10.0
+calc "2 * pi"           # 6.283185307179586
 calc "1 / 0"            # error: division by zero (exit 2)
 ```
 
