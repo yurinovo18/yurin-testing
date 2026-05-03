@@ -64,6 +64,7 @@ jobs:
           JF_URL: ${{ vars.JF_URL }}
         with:
           oidc-provider-name: yurinovo18/yurin-testing@github
+          version: latest
 
       - name: Ping Artifactory
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
