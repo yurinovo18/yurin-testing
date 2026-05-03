@@ -142,7 +142,8 @@ jobs:
           jf evd create \
             --predicate slsa-predicate.json \
             --predicate-type https://slsa.dev/provenance/v1 \
-            --package-name calc \
+            --package-name "calc" \
             --package-version "$BUILD_NUMBER" \
             --package-repo-name '${{ vars.JF_DOCKER_REPO }}' \
-            --key-alias yurin_calc_ci
+            --key "${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}" \
+            --key-alias "yurin_calc_ci"
