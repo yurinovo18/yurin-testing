@@ -133,8 +133,8 @@ jobs:
             | base64 -d \
             | jq '.predicate' > slsa-predicate.json
           jf evd create \
-            --predicate slsa-predicate.json \
-            --predicate-type https://slsa.dev/provenance/v1 \
+            --predicate "slsa-predicate.json" \
+            --predicate-type "https://jfrog.com/evidence/code-review/v1" \
             --package-repo-name "${{ vars.JF_DOCKER_REPO }}" \
             --package-name "calc" \
             --package-version "${{ github.run_number }}" \
