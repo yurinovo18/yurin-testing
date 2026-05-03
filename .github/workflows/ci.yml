@@ -123,7 +123,7 @@ jobs:
           JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
-          jf show config
+          jf config show
           echo '{"actor":"ci-bot","date":"2024-01-15T10:00:00Z","result":"pass"}' > predicate.json
           jf evd create \
             --package-name calc \
