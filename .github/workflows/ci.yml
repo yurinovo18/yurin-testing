@@ -141,7 +141,7 @@ jobs:
             --key evidence.key \
             --predicate ./predicate.json \
             --predicate-type https://jfrog.com/evidence/yuri/v1 \
-            --key-alias my-evidence-key-yurin
+            --key-alias "${KEY_ALIAS}"
 
       - name: Cleanup Local Key Files
         if: always()
