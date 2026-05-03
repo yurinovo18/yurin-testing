@@ -117,6 +117,21 @@ jobs:
           subject-name: oci://${{ steps.push.outputs.build-tag }}
           subject-digest: ${{ steps.push.outputs.digest }}
 
+      - name: test attestation on JFrog
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          echo '{"actor":"ci-bot","date":"2024-01-15T10:00:00Z","result":"pass"}' > predicate.json
+          jf evd create \
+            --package-name calc \
+            --package-version 13 \
+            --package-repo-name yuri-testing-local \
+            --predicate ./predicate.json \
+            --predicate-type https://jfrog.com/evidence/yuri/v1 \
+            --key-alias my-evidence-key-yurin
+
       - name: Attach attestation as evidence on the Docker package
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
@@ -140,21 +155,3 @@ jobs:
             --package-name calc \
             --package-version 13 \
             --key-alias "${{ vars.EVIDENCE_PUBLIC_KEY_ALIAS }}"
-          
-      
-
-      - name: test attestation on JFrog
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
-          BUILD_NUMBER: ${{ github.run_number }}
-        run: |
-          echo '{"actor":"ci-bot","date":"2024-01-15T10:00:00Z","result":"pass"}' > predicate.json
-          jf evd create \
-            --package-name calc \
-            --package-version 13 \
-            --package-repo-name yuri-testing-local \
-            --predicate ./predicate.json \
-            --predicate-type https://jfrog.com/evidence/yuri/v1 \
-            --key-alias my-evidence-key-yurin
-      
