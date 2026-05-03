@@ -6,8 +6,10 @@ on:
   pull_request:
 
 permissions:
-  id-token: write   # required for JFrog OIDC
+  id-token: write       # required for JFrog OIDC + signing
   contents: read
+  attestations: write   # required by actions/attest-build-provenance
+  actions: read         # detected by attest action for the GHA env
 
 jobs:
   test:
@@ -83,6 +85,7 @@ jobs:
           password: ${{ steps.setup-jfrog.outputs.oidc-token }}
 
       - name: Tag and push image
+        id: push
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           BUILD_NAME: calc
@@ -105,3 +108,17 @@ jobs:
           jf rt build-collect-env "$BUILD_NAME" "$BUILD_NUMBER"
           jf rt build-add-git "$BUILD_NAME" "$BUILD_NUMBER"
           jf rt build-publish "$BUILD_NAME" "$BUILD_NUMBER"
+
+          # Capture the manifest digest so we can attest it.
+          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$BUILD_TAG")"
+          DIGEST="${DIGEST##*@}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "build-tag=${BUILD_TAG}" >> "$GITHUB_OUTPUT"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Attest Build Provenance
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-name: oci://${{ steps.push.outputs.build-tag }}
+          subject-digest: ${{ steps.push.outputs.digest }}
