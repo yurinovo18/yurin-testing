@@ -117,8 +117,32 @@ jobs:
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
       - name: Attest Build Provenance
+        id: attest
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/attest-build-provenance@v3
         with:
           subject-name: oci://${{ steps.push.outputs.build-tag }}
           subject-digest: ${{ steps.push.outputs.digest }}
+
+      - name: Attach attestation as evidence on the Docker package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          BUNDLE='${{ steps.attest.outputs.bundle-path }}'
+          # The attestation bundle is a sigstore bundle wrapping a DSSE
+          # envelope wrapping an in-toto Statement. Pull just the SLSA
+          # provenance predicate so JFrog stores something whose schema
+          # actually matches --predicate-type.
+          jq -r '.dsseEnvelope.payload' "$BUNDLE" \
+            | base64 -d \
+            | jq '.predicate' > slsa-predicate.json
+          jf evd create \
+            --predicate slsa-predicate.json \
+            --predicate-type https://slsa.dev/provenance/v1 \
+            --package-name calc \
+            --package-version "$BUILD_NUMBER" \
+            --package-repo-name '${{ vars.JF_DOCKER_REPO }}' \
+            --key-alias yurin_calc_ci
