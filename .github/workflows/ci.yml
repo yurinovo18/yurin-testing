@@ -116,7 +116,7 @@ jobs:
 
       - name: Generate Evidence Key Pair
         run: |
-          echo "KEY_ALIAS = $KEY_ALIAS"
+          echo "$KEY_ALIAS"
           jf evd generate-key-pair \
             --key-alias "${KEY_ALIAS}"
 
