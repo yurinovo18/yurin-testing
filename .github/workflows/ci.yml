@@ -7,9 +7,10 @@ on:
 
 permissions:
   id-token: write       # required for JFrog OIDC + signing
-  contents: write
+  contents: read
   attestations: write   # required by actions/attest-build-provenance
   actions: write         # detected by attest action for the GHA env
+  packages: write
 
 jobs:
   ci:
