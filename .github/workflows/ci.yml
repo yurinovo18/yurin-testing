@@ -109,6 +109,16 @@ jobs:
           echo "build-tag=${BUILD_TAG}" >> "$GITHUB_OUTPUT"
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
+      - name: Set Environment Variables
+        run: |
+          echo "KEY_ALIAS=yurin-calc-${{ github.run_number }}" >> $GITHUB_ENV
+
+      - name: Generate Evidence Key Pair
+        run: |
+          echo "KEY_ALIAS = $KEY_ALIAS"
+          jf evd generate-key-pair \
+            --key-alias "${KEY_ALIAS}"
+
       - name: Attest Build Provenance
         id: attest
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -120,7 +130,6 @@ jobs:
       - name: test attestation on JFrog
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
-          JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
           jf config show
@@ -129,10 +138,15 @@ jobs:
             --package-name calc \
             --package-version 13 \
             --package-repo-name yuri-testing-local \
-            --key "$JFROG_CLI_SIGNING_KEY" \
+            --key evidence.key \
             --predicate ./predicate.json \
             --predicate-type https://jfrog.com/evidence/yuri/v1 \
             --key-alias my-evidence-key-yurin
+
+      - name: Cleanup Local Key Files
+        if: always()
+        run: |
+          rm -f evidence.key evidence.pub 2>/dev/null || true
 
       - name: Attach attestation as evidence on the Docker package
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
