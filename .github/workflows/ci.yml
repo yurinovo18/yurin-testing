@@ -129,6 +129,7 @@ jobs:
             --package-version 13 \
             --package-repo-name yuri-testing-local \
             --predicate ./predicate.json \
+            --key "JFROG_CLI_SIGNING_KEY" \
             --predicate-type https://jfrog.com/evidence/yuri/v1 \
             --key-alias my-evidence-key-yurin
 
