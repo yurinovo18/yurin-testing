@@ -141,7 +141,8 @@ jobs:
             --key evidence.key \
             --predicate ./predicate.json \
             --predicate-type https://jfrog.com/evidence/yuri/v1 \
-            --key-alias "${KEY_ALIAS}"
+            --key-alias "${KEY_ALIAS}" \
+            --provider-id GITHUB
 
       - name: Cleanup Local Key Files
         if: always()
