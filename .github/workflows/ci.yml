@@ -123,6 +123,7 @@ jobs:
           JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
           BUILD_NUMBER: ${{ github.run_number }}
         run: |
+          jf show config
           echo '{"actor":"ci-bot","date":"2024-01-15T10:00:00Z","result":"pass"}' > predicate.json
           jf evd create \
             --package-name calc \
@@ -151,7 +152,7 @@ jobs:
           jf evd create \
             --predicate slsa-predicate.json \
             --predicate-type https://jfrog.com/evidence/code-review/v1 \
-            --key "${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}" \
+            --key "$JFROG_CLI_SIGNING_KEY" \
             --package-repo-name yuri-testing-local \
             --package-name calc \
             --package-version 13 \
