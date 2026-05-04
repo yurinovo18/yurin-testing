@@ -40,7 +40,7 @@ jobs:
       - name: Install and Configure JFrog CLI
         id: setup-jfrog-cli
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: jfrog/setup-jfrog-cli@4
+        uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: https://${{ vars.JF_URL }}
         with:
