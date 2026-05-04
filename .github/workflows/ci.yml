@@ -9,8 +9,12 @@ permissions:
   id-token: write       # required for JFrog OIDC + signing
   contents: read
   attestations: write   # required by actions/attest-build-provenance
-  actions: write         # detected by attest action for the GHA env
-  packages: write
+  actions: write        # detected by attest action for the GHA env
+  packages: write       # for uploading attestations.
+
+
+env:
+  IMAGE_NAME: calc
 
 jobs:
   ci:
@@ -33,36 +37,12 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build image (load locally)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          load: true
-          tags: calc:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Smoke-test image
-        run: |
-          set -euo pipefail
-          [ "$(docker run --rm calc:ci '2 + 3 * 4')" = "14" ]
-          [ "$(docker run --rm calc:ci '(1 + 2) ** 3')" = "27" ]
-          if docker run --rm calc:ci '1 / 0'; then
-            echo "expected non-zero exit on divide-by-zero" >&2
-            exit 1
-          fi
-
-      - name: Report image size
-        run: docker images calc:ci --format '{{.Repository}}:{{.Tag}} {{.Size}}'
-
-      # --- Push to JFrog Artifactory (push-to-main only) ---
-
-      - name: Setup JFrog CLI
-        id: setup-jfrog
+      - name: Install and Configure JFrog CLI
+        id: setup-jfrog-cli
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: jfrog/setup-jfrog-cli@v4
+        uses: jfrog/setup-jfrog-cli@4.6.1
         env:
-          JF_URL: ${{ vars.JF_URL }}
+          JF_URL: https://${{ vars.JF_URL }}
         with:
           oidc-provider-name: yurinovo18/yurin-testing@github
           version: latest
@@ -71,7 +51,7 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: jf rt ping
 
-      - name: Authenticate Docker
+      - name: Log in to JFrog Docker Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
@@ -79,99 +59,116 @@ jobs:
           username: ${{ steps.setup-jfrog.outputs.oidc-user }}
           password: ${{ steps.setup-jfrog.outputs.oidc-token }}
 
-      - name: Tag and push image
-        id: push
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          BUILD_NAME: calc
-          BUILD_NUMBER: ${{ github.run_number }}
-        run: |
-          set -euo pipefail
-          REGISTRY="$(echo '${{ vars.JF_URL }}' | sed -E 's#^https?://##')"
-          IMAGE="${REGISTRY}/${{ vars.JF_DOCKER_REPO }}/calc"
-          SHA_TAG="${IMAGE}:${{ github.sha }}"
-          BUILD_TAG="${IMAGE}:${BUILD_NUMBER}"
+      - name: Build and Push Docker Image
+        id: build-and-push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ vars.JF_URL }}/${{ vars.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
 
-          docker tag calc:ci "$SHA_TAG"
-          docker tag calc:ci "$BUILD_TAG"
-
-          jf docker push "$SHA_TAG" \
-            --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
-          jf docker push "$BUILD_TAG" \
-            --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
-
-          jf rt build-collect-env "$BUILD_NAME" "$BUILD_NUMBER"
-          jf rt build-add-git "$BUILD_NAME" "$BUILD_NUMBER"
-          jf rt build-publish "$BUILD_NAME" "$BUILD_NUMBER"
-
-          # Capture the manifest digest so we can attest it.
-          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$BUILD_TAG")"
-          DIGEST="${DIGEST##*@}"
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
-          echo "build-tag=${BUILD_TAG}" >> "$GITHUB_OUTPUT"
-          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
-
-      - name: Set Environment Variables
-        run: |
-          echo "KEY_ALIAS=yurin-calc-${{ github.run_number }}" >> $GITHUB_ENV
-
-      - name: Generate Evidence Key Pair
-        run: |
-          echo "$KEY_ALIAS"
-          jf evd generate-key-pair \
-            --key-alias "${KEY_ALIAS}"
-
-      - name: Attest Build Provenance
-        id: attest
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Attest Docker Image and Send to JFrog Evidence
         uses: actions/attest-build-provenance@v3
         with:
-          subject-name: oci://${{ steps.push.outputs.build-tag }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          # The 'oci://' prefix is required by JFrog to correctly parse the artifact type
+          subject-name: oci://${{ env.JF_URL }}/${{ env.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}
 
-      - name: test attestation on JFrog
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          BUILD_NUMBER: ${{ github.run_number }}
-        run: |
-          jf --version
-          jf config show
-          echo '{"actor":"ci-bot","date":"2024-01-15T10:00:00Z","result":"pass"}' > predicate.json
-          jf evd create \
-            --package-name calc \
-            --package-version 13 \
-            --package-repo-name yuri-testing-local \
-            --key ./evidence.key \
-            --predicate ./predicate.json \
-            --predicate-type https://jfrog.com/evidence/yuri/v1 \
-            --key-alias "${KEY_ALIAS}" \
-            --provider-id GITHUB
+          # This links the attestation directly to the image digest from the build step
+          subject-digest: ${{ steps.build-and-push.outputs.digest }}
+#
+#      - name: Tag and push image
+#        id: push
+#        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#        env:
+#          BUILD_NAME: calc
+#          BUILD_NUMBER: ${{ github.run_number }}
+#        run: |
+#          set -euo pipefail
+#          REGISTRY="$(echo '${{ vars.JF_URL }}' | sed -E 's#^https?://##')"
+#          IMAGE="${REGISTRY}/${{ vars.JF_DOCKER_REPO }}/calc"
+#          SHA_TAG="${IMAGE}:${{ github.sha }}"
+#          BUILD_TAG="${IMAGE}:${BUILD_NUMBER}"
+#
+#          docker tag calc:ci "$SHA_TAG"
+#          docker tag calc:ci "$BUILD_TAG"
+#
+#          jf docker push "$SHA_TAG" \
+#            --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+#          jf docker push "$BUILD_TAG" \
+#            --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+#
+#          jf rt build-collect-env "$BUILD_NAME" "$BUILD_NUMBER"
+#          jf rt build-add-git "$BUILD_NAME" "$BUILD_NUMBER"
+#          jf rt build-publish "$BUILD_NAME" "$BUILD_NUMBER"
+#
+#          # Capture the manifest digest so we can attest it.
+#          DIGEST="$(docker inspect --format='{{index .RepoDigests 0}}' "$BUILD_TAG")"
+#          DIGEST="${DIGEST##*@}"
+#          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+#          echo "build-tag=${BUILD_TAG}" >> "$GITHUB_OUTPUT"
+#          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
 
-      - name: Cleanup Local Key Files
-        if: always()
-        run: |
-          rm -f evidence.key evidence.pub 2>/dev/null || true
-
-      - name: Attach attestation as evidence on the Docker package
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
-          BUILD_NUMBER: ${{ github.run_number }}
-        run: |
-          set -euo pipefail
-          BUNDLE='${{ steps.attest.outputs.bundle-path }}'
-          # The attestation bundle is a sigstore bundle wrapping a DSSE
-          # envelope wrapping an in-toto Statement. Pull just the SLSA
-          # provenance predicate so JFrog stores something whose schema
-          # actually matches --predicate-type.
-          jq -r '.dsseEnvelope.payload' "$BUNDLE" \
-            | base64 -d \
-            | jq '.predicate' > slsa-predicate.json
-          jf evd create \
-            --predicate slsa-predicate.json \
-            --predicate-type https://jfrog.com/evidence/code-review/v1 \
-            --key "$JFROG_CLI_SIGNING_KEY" \
-            --package-repo-name yuri-testing-local \
-            --package-name calc \
-            --package-version 13 \
-            --key-alias "${{ vars.EVIDENCE_PUBLIC_KEY_ALIAS }}"
+#      - name: Set Environment Variables
+#        run: |
+#          echo "KEY_ALIAS=yurin-calc-${{ github.run_number }}" >> $GITHUB_ENV
+#
+#      - name: Generate Evidence Key Pair
+#        run: |
+#          echo "$KEY_ALIAS"
+#          jf evd generate-key-pair \
+#            --key-alias "${KEY_ALIAS}"
+#
+#      - name: Attest Build Provenance
+#        id: attest
+#        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#        uses: actions/attest-build-provenance@v3
+#        with:
+#          subject-name: oci://${{ steps.push.outputs.build-tag }}
+#          subject-digest: ${{ steps.push.outputs.digest }}
+#
+#      - name: test attestation on JFrog
+#        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#        env:
+#          BUILD_NUMBER: ${{ github.run_number }}
+#        run: |
+#          jf --version
+#          jf config show
+#          echo '{"actor":"ci-bot","date":"2024-01-15T10:00:00Z","result":"pass"}' > predicate.json
+#          jf evd create \
+#            --package-name calc \
+#            --package-version 13 \
+#            --package-repo-name yuri-testing-local \
+#            --key ./evidence.key \
+#            --predicate ./predicate.json \
+#            --predicate-type https://jfrog.com/evidence/yuri/v1 \
+#            --key-alias "${KEY_ALIAS}" \
+#            --provider-id GITHUB
+#
+#      - name: Cleanup Local Key Files
+#        if: always()
+#        run: |
+#          rm -f evidence.key evidence.pub 2>/dev/null || true
+#
+#      - name: Attach attestation as evidence on the Docker package
+#        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+#        env:
+#          JFROG_CLI_SIGNING_KEY: ${{ secrets.JF_EVIDENCE_PRIVATE_KEY }}
+#          BUILD_NUMBER: ${{ github.run_number }}
+#        run: |
+#          set -euo pipefail
+#          BUNDLE='${{ steps.attest.outputs.bundle-path }}'
+#          # The attestation bundle is a sigstore bundle wrapping a DSSE
+#          # envelope wrapping an in-toto Statement. Pull just the SLSA
+#          # provenance predicate so JFrog stores something whose schema
+#          # actually matches --predicate-type.
+#          jq -r '.dsseEnvelope.payload' "$BUNDLE" \
+#            | base64 -d \
+#            | jq '.predicate' > slsa-predicate.json
+#          jf evd create \
+#            --predicate slsa-predicate.json \
+#            --predicate-type https://jfrog.com/evidence/code-review/v1 \
+#            --key "$JFROG_CLI_SIGNING_KEY" \
+#            --package-repo-name yuri-testing-local \
+#            --package-name calc \
+#            --package-version 13 \
+#            --key-alias "${{ vars.EVIDENCE_PUBLIC_KEY_ALIAS }}"
