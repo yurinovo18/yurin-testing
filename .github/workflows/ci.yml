@@ -38,7 +38,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Install and Configure JFrog CLI
-        id: setup-jfrog-cli
+        id: setup-jfrog
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: jfrog/setup-jfrog-cli@v4
         env:
