@@ -71,6 +71,8 @@ jobs:
           context: .
           push: true
           tags: ${{ vars.JF_URL }}/${{ vars.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Attest Docker Image and Send to JFrog Evidence
         id: attest
@@ -102,3 +104,4 @@ jobs:
             --server-id "$JF_SERVER_ID" \
             --subject-repo-path "$SUBJECT_PATH" \
             --sigstore-bundle "${{ steps.attest.outputs.bundle-path }}"
+            --providerId "github"
