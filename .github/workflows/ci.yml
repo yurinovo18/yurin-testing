@@ -92,7 +92,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          jf rt build-collect-env "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
+          jf rt build-collect-env "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER"
           jf rt build-add-git    "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
           jf rt build-publish    "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
 
