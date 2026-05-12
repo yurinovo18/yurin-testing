@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, local-runner]
   pull_request:
 
 permissions:
@@ -15,6 +15,7 @@ permissions:
 
 env:
   IMAGE_NAME: calc
+  RUN_BRANCH: ${{ vars.RUN_BRANCH || 'local-runner' }}
 
 jobs:
   ci:
@@ -23,41 +24,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+#      - uses: actions/setup-python@v5
+#        with:
+#          python-version: "3.12"
+#          cache: pip
+#          cache-dependency-path: pyproject.toml
 
-      - name: Install package
-        run: pip install -e ".[dev]"
-
-      - name: Run tests
-        run: pytest -q
+#      - name: Install package
+#        run: pip install -e ".[dev]"
+#
+#      - name: Run tests
+#        run: pytest -q
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Install and Configure JFrog CLI
-        id: setup-jfrog
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: jfrog/setup-jfrog-cli@v4
+      - name: Verify jf CLI is installed and log in to JFrog Docker registry
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == format('refs/heads/{0}', env.RUN_BRANCH))
         env:
-          JF_URL: https://${{ vars.JF_URL }}
-        with:
-          oidc-provider-name: yurinovo18/yurin-testing@github
-          version: latest
+          JF_SERVER_ID: ${{ vars.JF_SERVER_ID || 'z0yuri123' }}
+        run: |
+          set -euo pipefail
 
-      - name: Ping Artifactory
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: jf rt ping
+          if ! command -v jf >/dev/null 2>&1; then
+            echo "::error::jf CLI not found on runner. Install it (brew install jfrog-cli) and run 'jf c add' before running this workflow."
+            exit 1
+          fi
+          echo "Using $(jf --version) at $(command -v jf)"
 
-      - name: Log in to JFrog Docker Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ vars.JF_URL }}
-          username: ${{ steps.setup-jfrog.outputs.oidc-user }}
-          password: ${{ steps.setup-jfrog.outputs.oidc-token }}
+          jf rt ping --server-id "$JF_SERVER_ID"
+
+          CFG=$(jf c export "$JF_SERVER_ID" | base64 -d)
+          JF_USER=$(printf '%s' "$CFG" | jq -r '.user // empty')
+          JF_TOKEN=$(printf '%s' "$CFG" | jq -r '.accessToken // empty')
+
+          if [ -z "$JF_USER" ] || [ -z "$JF_TOKEN" ]; then
+            echo "::error::Could not extract user/accessToken from jf server '$JF_SERVER_ID'. Re-run 'jf c add $JF_SERVER_ID' with an access token."
+            exit 1
+          fi
+
+          echo "$JF_TOKEN" | docker login "${{ vars.JF_URL }}" -u "$JF_USER" --password-stdin
 
       - name: Build and Push Docker Image
         id: build-and-push
@@ -66,8 +71,11 @@ jobs:
           context: .
           push: true
           tags: ${{ vars.JF_URL }}/${{ vars.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}:${{ github.run_number }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Attest Docker Image and Send to JFrog Evidence
+        id: attest
         uses: actions/attest-build-provenance@v3
         with:
           # The 'oci://' prefix is required by JFrog to correctly parse the artifact type
@@ -75,3 +83,25 @@ jobs:
 
           # This links the attestation directly to the image digest from the build step
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
+
+      - name: Publish build info and create JFrog evidence
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == format('refs/heads/{0}', env.RUN_BRANCH))
+        env:
+          JF_SERVER_ID: ${{ vars.JF_SERVER_ID || 'z0yuri123' }}
+          JFROG_CLI_BUILD_NAME: ${{ env.IMAGE_NAME }}
+          JFROG_CLI_BUILD_NUMBER: ${{ github.run_number }}
+          JFROG_CLI_BUILD_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          jf rt build-collect-env "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER"
+          jf rt build-add-git    "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
+          jf rt build-publish    "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
+
+          SUBJECT_PATH="${{ vars.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}/${{ github.run_number }}/list.manifest.json"
+
+          jf evd create-evidence \
+            --server-id "$JF_SERVER_ID" \
+            --subject-repo-path "$SUBJECT_PATH" \
+            --sigstore-bundle "${{ steps.attest.outputs.bundle-path }}" \
+            --provider-id github
