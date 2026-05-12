@@ -96,7 +96,7 @@ jobs:
           jf rt build-add-git    "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
           jf rt build-publish    "$JFROG_CLI_BUILD_NAME" "$JFROG_CLI_BUILD_NUMBER" --server-id "$JF_SERVER_ID"
 
-          SUBJECT_PATH="${{ vars.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}/${{ github.run_number }}/manifest.json"
+          SUBJECT_PATH="${{ vars.JF_DOCKER_REPO }}/${{ env.IMAGE_NAME }}/${{ github.run_number }}/list.manifest.json"
 
           jf evd create-evidence \
             --server-id "$JF_SERVER_ID" \
