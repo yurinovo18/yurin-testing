@@ -104,4 +104,4 @@ jobs:
             --server-id "$JF_SERVER_ID" \
             --subject-repo-path "$SUBJECT_PATH" \
             --sigstore-bundle "${{ steps.attest.outputs.bundle-path }}"
-            --providerId "github"
+            --provider-id "github"
