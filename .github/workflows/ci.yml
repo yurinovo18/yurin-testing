@@ -19,7 +19,7 @@ env:
 jobs:
   ci:
     name: test, build, push
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +39,6 @@ jobs:
 
       - name: Install and Configure JFrog CLI
         id: setup-jfrog
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: https://${{ vars.JF_URL }}
@@ -48,11 +47,9 @@ jobs:
           version: latest
 
       - name: Ping Artifactory
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: jf rt ping
 
       - name: Log in to JFrog Docker Registry
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           registry: ${{ vars.JF_URL }}
