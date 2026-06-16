@@ -165,3 +165,17 @@ def test_factorial_and_gcd(expr, expected):
 def test_factorial_negative_raises():
     with pytest.raises(CalculatorError, match="factorial"):
         evaluate("factorial(-1)")
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ("lcm(4, 6)", 12),
+        ("lcm(7, 13)", 91),
+        ("lcm(12, 8)", 24),
+        ("hypot(3, 4)", 5.0),
+        ("hypot(5, 12)", 13.0),
+    ],
+)
+def test_lcm_and_hypot(expr, expected):
+    assert math.isclose(evaluate(expr), expected)
