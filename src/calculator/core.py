@@ -46,6 +46,8 @@ _FUNCTIONS = {
     "radians": math.radians,
     "factorial": math.factorial,
     "gcd": math.gcd,
+    "lcm": math.lcm,
+    "hypot": math.hypot,
 }
 
 _CONSTANTS = {
