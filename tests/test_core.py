@@ -179,3 +179,18 @@ def test_factorial_negative_raises():
 )
 def test_lcm_and_hypot(expr, expected):
     assert math.isclose(evaluate(expr), expected)
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ("atan2(1, 1)", math.pi / 4),
+        ("atan2(0, 1)", 0.0),
+        ("atan2(1, 0)", math.pi / 2),
+        ("trunc(3.9)", 3),
+        ("trunc(-3.9)", -3),
+        ("trunc(2.1)", 2),
+    ],
+)
+def test_atan2_and_trunc(expr, expected):
+    assert math.isclose(evaluate(expr), expected)

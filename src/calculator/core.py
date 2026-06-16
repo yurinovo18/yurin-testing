@@ -48,6 +48,8 @@ _FUNCTIONS = {
     "gcd": math.gcd,
     "lcm": math.lcm,
     "hypot": math.hypot,
+    "atan2": math.atan2,
+    "trunc": math.trunc,
 }
 
 _CONSTANTS = {
