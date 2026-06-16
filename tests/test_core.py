@@ -127,3 +127,20 @@ def test_function_domain_error():
 def test_function_keyword_args_rejected():
     with pytest.raises(CalculatorError, match="keyword"):
         evaluate("log(8, base=2)")
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ("degrees(pi)", 180.0),
+        ("degrees(tau)", 360.0),
+        ("degrees(pi / 2)", 90.0),
+        ("radians(180)", math.pi),
+        ("radians(90)", math.pi / 2),
+        ("round(3.7)", 4),
+        ("round(3.2)", 3),
+        ("round(3.456, 2)", 3.46),
+    ],
+)
+def test_degrees_radians_round(expr, expected):
+    assert math.isclose(evaluate(expr), expected)

@@ -39,8 +39,11 @@ _FUNCTIONS = {
     "exp": math.exp,
     "floor": math.floor,
     "ceil": math.ceil,
+    "round": round,
     "abs": abs,
     "pow": pow,
+    "degrees": math.degrees,
+    "radians": math.radians,
 }
 
 _CONSTANTS = {
