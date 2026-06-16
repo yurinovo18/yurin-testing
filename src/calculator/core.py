@@ -44,6 +44,8 @@ _FUNCTIONS = {
     "pow": pow,
     "degrees": math.degrees,
     "radians": math.radians,
+    "factorial": math.factorial,
+    "gcd": math.gcd,
 }
 
 _CONSTANTS = {

@@ -144,3 +144,24 @@ def test_function_keyword_args_rejected():
 )
 def test_degrees_radians_round(expr, expected):
     assert math.isclose(evaluate(expr), expected)
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ("factorial(0)", 1),
+        ("factorial(1)", 1),
+        ("factorial(5)", 120),
+        ("factorial(10)", 3628800),
+        ("gcd(12, 8)", 4),
+        ("gcd(100, 75)", 25),
+        ("gcd(7, 13)", 1),
+    ],
+)
+def test_factorial_and_gcd(expr, expected):
+    assert evaluate(expr) == expected
+
+
+def test_factorial_negative_raises():
+    with pytest.raises(CalculatorError, match="factorial"):
+        evaluate("factorial(-1)")
